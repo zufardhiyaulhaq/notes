@@ -1,0 +1,6 @@
+title: KEDA
+nav:
+  - index.md
+  - cron.md
+  - http.md
+  - kubernetes-workload.md
