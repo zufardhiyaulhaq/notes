@@ -1,0 +1,5 @@
+nav:
+  - Home: index.md
+  - TIL: til/index.md
+  - Cheatsheets: cheatsheets
+  - Guides: guides

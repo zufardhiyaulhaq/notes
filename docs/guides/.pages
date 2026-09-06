@@ -1,0 +1,8 @@
+title: Guides
+nav:
+  - index.md
+  - engineering-notes
+  - cloudnativepg
+  - keda
+  - vLLM: vllm/index.md
+  - LLM from Scratch: llm-from-scratch/index.md

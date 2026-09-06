@@ -1,0 +1,4 @@
+title: Cheatsheets
+nav:
+  - index.md
+  - Kubernetes: kubernetes.md
