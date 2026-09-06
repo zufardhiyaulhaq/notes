@@ -58,6 +58,11 @@ extra:
 
 plugins:
   - search
+  - mkdocs-jupyter:
+      execute: false
+      include_source: true
+      ignore_h1_titles: true
+  - awesome-pages
   - tags
   - blog:
       blog_dir: til
@@ -93,12 +98,5 @@ markdown_extensions:
       emoji_index: !!python/name:material.extensions.emoji.twemoji
       emoji_generator: !!python/name:material.extensions.emoji.to_svg
 
-nav:
-  - Home: index.md
-  - TIL: til/index.md
-  - Cheatsheets:
-      - cheatsheets/index.md
-      - Kubernetes: cheatsheets/kubernetes.md
-  - Guides:
-      - guides/index.md
-      - Renew a kubeadm cluster certificate: guides/renew-kubeadm-cluster.md
+# Navigation order and section titles are controlled by the
+# mkdocs-awesome-pages-plugin via `.pages` files in docs/ and its subdirectories.

@@ -1,0 +1,20 @@
+title: CloudNativePG
+nav:
+  - index.md
+  - 01-simple-cluster.md
+  - 02-increase-disk.md
+  - 03-change-storageclass.md
+  - 04-minor-postgresql-upgrade.md
+  - 05-minor-postgresql-downgrade.md
+  - 06-wal-storage.md
+  - 07-synchronous-replica.md
+  - 08-base-backup-volume-snapshot.md
+  - 09-restore-from-base-backup.md
+  - 10-request-limit.md
+  - 11-wal-archival.md
+  - 12-pitr-restore.md
+  - 13-upgrade-postgresql-major-in-place.md
+  - 14-migrate-postgresql-any-to-cnpg.md
+  - 15-major-upgrade-logical-replication.md
+  - 16-monitoring.md
+  - 17-upgrading-cnpg-operator.md
