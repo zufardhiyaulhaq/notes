@@ -1,0 +1,48 @@
+/* Match zufardhiyaulhaq.com: cool paper, near-black ink, one cobalt accent. */
+
+:root {
+  --zd-paper: #F6F6F3;
+  --zd-ink: #16161A;
+  --zd-cobalt: #1E3AE0;
+  --zd-cobalt-deep: #142AA8;
+}
+
+/* Light scheme */
+[data-md-color-scheme="default"] {
+  --md-default-bg-color: var(--zd-paper);
+  --md-primary-fg-color: var(--zd-ink);
+  --md-primary-fg-color--light: #2a2a30;
+  --md-primary-fg-color--dark: #0f0f12;
+  --md-accent-fg-color: var(--zd-cobalt);
+  --md-typeset-a-color: var(--zd-cobalt);
+}
+
+/* Dark scheme keeps Material slate, just swaps the accent to cobalt */
+[data-md-color-scheme="slate"] {
+  --md-accent-fg-color: #6f83ff;
+  --md-typeset-a-color: #8fa0ff;
+}
+
+/* Header: paper with ink text + hairline, like the main site */
+[data-md-color-scheme="default"] .md-header {
+  background-color: var(--zd-paper);
+  color: var(--zd-ink);
+  border-bottom: 1px solid #E4E4DE;
+  box-shadow: none;
+}
+[data-md-color-scheme="default"] .md-header--shadow { box-shadow: none; }
+[data-md-color-scheme="default"] .md-tabs {
+  background-color: var(--zd-paper);
+  color: var(--zd-ink);
+  border-bottom: 1px solid #E4E4DE;
+}
+
+/* Typography niceties */
+.md-typeset h1,
+.md-typeset h2,
+.md-typeset h3 { letter-spacing: -0.02em; font-weight: 600; }
+
+.md-typeset code { font-size: 0.82em; }
+
+/* Wordmark accent dot to echo the main site */
+.md-header__title .md-header__topic:first-child { font-weight: 600; }
