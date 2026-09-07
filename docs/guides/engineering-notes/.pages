@@ -1,5 +1,6 @@
 title: Engineering Notes
 nav:
+  - http-header-limits.md
   - certificate-pinning.md
   - kubeconfig-from-service-account.md
   - docker-build-push.md
