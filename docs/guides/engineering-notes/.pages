@@ -1,4 +1,5 @@
 title: Engineering Notes
 nav:
+  - certificate-pinning.md
   - kubeconfig-from-service-account.md
   - docker-build-push.md
