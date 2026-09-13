@@ -11,7 +11,7 @@ tags:
 
 A dashboard you create or edit in the Grafana UI lives in Grafana's own database, on its PVC. Destroy the PVC or the Grafana pod and those dashboards are gone. The fix is to keep dashboards as code in Git and let the cluster re-provision them, so the running Grafana is disposable.
 
-Self-hosted OSS Grafana has no built-in "pull dashboards from a Git URL" feature. Grafana 11 and 12 ship a newer Git Sync preview, and Grafana Cloud has provisioning-as-code, but you need neither. The GitOps-native answer that already ships with the chart is the **Grafana dashboard sidecar**.
+There are two ways to get there. Grafana 11 and later (so also current Grafana 13) ship a newer **Git Sync** feature that connects Grafana directly to a Git repository, and Grafana Cloud has the same provisioning-as-code. This guide uses the other approach, the **Grafana dashboard sidecar**, because it delivers dashboards through the same GitOps pipeline that already reconciles the rest of the cluster. Git Sync is covered at the end as the alternative to consider.
 
 This is written for the [victoria-metrics-k8s-stack](https://github.com/VictoriaMetrics/helm-charts/tree/master/charts/victoria-metrics-k8s-stack) chart, which bundles the upstream Grafana Helm chart, but it applies to any install of that Grafana chart.
 
@@ -159,9 +159,23 @@ Dashboards become disposable and reproducible. The source of truth is the JSON i
 
 3. Open the dashboard by uid in the browser: `/d/<uid>`.
 
+## Alternative: Git Sync (Grafana 11+)
+
+Grafana 11 and 12 and later, and Grafana Cloud, can connect Grafana directly to a Git repository and sync dashboards from it. It runs on Grafana's newer app-platform and unified storage layer. The headline difference from the sidecar is that Git Sync is **bidirectional**: a dashboard edited in the UI can be written back to Git through a branch and pull-request workflow, so the UI and the repo stay in step.
+
+It is still a preview and experimental feature. It sits behind feature flags, and the APIs and behavior are still changing between releases, so pin your Grafana version and expect to revisit the setup as it stabilizes.
+
+How the two approaches compare:
+
+- **Git Sync** is a second, Grafana-managed sync path. Grafana itself reaches out to Git, so you configure a Git token and outbound access inside Grafana, and dashboards are managed by Grafana's own reconciler.
+- **The sidecar** delivers dashboards through the same Kustomize and GitOps pipeline as the rest of the cluster. Dashboards are just ConfigMaps, so there is one source of truth, no extra credentials, and the mechanism is GA and version-independent.
+
+Prefer Git Sync when you want to author and edit dashboards in the UI and have those edits flow back to Git with review, when authoring is heavily UI-first, or when you are on Grafana Cloud. For a cluster already reconciled by GitOps, the sidecar is the stable default, and Git Sync is the alternative to watch as it matures.
+
 ## Sources
 
 - Grafana Helm chart, [sidecar for dashboards](https://github.com/grafana/helm-charts/tree/main/charts/grafana#sidecar-for-dashboards) (the `sidecar.dashboards` values, `searchNamespace`, `folderAnnotation`).
 - [`kiwigrid/k8s-sidecar`](https://github.com/kiwigrid/k8s-sidecar): `METHOD`, `LABEL`, `LABEL_VALUE`, `FOLDER`, `RESOURCE`, and reload behavior.
 - Grafana docs: [provision dashboards](https://grafana.com/docs/grafana/latest/administration/provisioning/#dashboards) and the [admin provisioning reload API](https://grafana.com/docs/grafana/latest/developers/http_api/admin/#reload-provisioning-configurations).
+- Grafana Git Sync (the alternative): [Introduction to Git Sync](https://grafana.com/docs/grafana/latest/as-code/observability-as-code/git-sync/) and [work with provisioned dashboards](https://grafana.com/docs/grafana/latest/as-code/observability-as-code/provision-resources/provisioned-dashboards/).
 - [victoria-metrics-k8s-stack](https://github.com/VictoriaMetrics/helm-charts/tree/master/charts/victoria-metrics-k8s-stack) chart, which bundles the Grafana chart.
