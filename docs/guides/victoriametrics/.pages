@@ -1,0 +1,4 @@
+title: VictoriaMetrics
+nav:
+  - index.md
+  - 01-sync-grafana-dashboards-from-git.md

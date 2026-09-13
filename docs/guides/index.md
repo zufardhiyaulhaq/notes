@@ -6,6 +6,7 @@ the various `-learning` repos. Browse by topic:
 
 - [Engineering Notes](engineering-notes/certificate-pinning.md): standalone how-tos, like certificate pinning, creating a kubeconfig from a ServiceAccount, and building/pushing Docker images.
 - [CloudNativePG](cloudnativepg/index.md): a hands-on series on running PostgreSQL with the CloudNativePG operator.
+- [VictoriaMetrics](victoriametrics/index.md): a series on running the VictoriaMetrics Kubernetes stack, starting with GitOps for Grafana dashboards.
 - [KEDA](keda/index.md): event-driven autoscaling on Kubernetes with cron, HTTP, and workload scalers.
 - [vLLM](vllm/index.md): notes on deploying large language models across multiple nodes.
 - [LLM from Scratch](llm-from-scratch/index.md): learning to build a language model by hand.
