@@ -10,17 +10,13 @@ Working notes I keep for myself — the quick things I look *up*, not read cover
 cover. The longer, polished writing lives on
 [zufardhiyaulhaq.com](https://zufardhiyaulhaq.com).
 
-Three kinds of notes:
+Two kinds of notes:
 
 <div class="grid cards" markdown>
 
 -   :material-lightbulb-on: __[TIL](til/index.md)__
 
     One small thing I learned, dated and tagged. A running stream.
-
--   :material-console: __[Cheatsheets](cheatsheets/index.md)__
-
-    Commands grouped by tool. Copy, paste, move on.
 
 -   :material-book-open-variant: __[Guides](guides/index.md)__
 
