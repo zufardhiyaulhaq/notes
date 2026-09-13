@@ -3,6 +3,7 @@ nav:
   - index.md
   - engineering-notes
   - cloudnativepg
+  - victoriametrics
   - keda
   - vLLM: vllm
   - LLM from Scratch: llm-from-scratch
