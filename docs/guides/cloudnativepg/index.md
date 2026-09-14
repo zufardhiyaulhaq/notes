@@ -43,6 +43,7 @@ spec:
 spec:
   primaryUpdateStrategy: supervised
 ```
+14. we can create master only database in CNPG by setting spec.instances to 1.
 
 ## Cheatsheet
 
