@@ -88,6 +88,70 @@ echo-postgresql-daily-backup-20250706040410       true         echo-postgresql-1
 echo-postgresql-daily-backup-20250706040410-wal   true         echo-postgresql-14-wal                           1Gi           alibabacloud-disk-snapshot   snapcontent-82fe6532-438c-4d7d-bc54-9c93b7ed72a5   89s            89s
 ```
 
+## Manifests
+
+??? example "cluster.yaml"
+
+    ```yaml
+    apiVersion: postgresql.cnpg.io/v1
+    kind: Cluster
+    metadata:
+      name: echo-postgresql
+      namespace: cnpg-system
+    spec:
+      instances: 3
+      storage:
+        size: 20Gi
+        storageClass: gtf-ack-essd-pl0-wait
+      walStorage:
+        size: 1Gi
+        storageClass: gtf-ack-essd-pl0-wait
+      primaryUpdateStrategy: unsupervised
+      primaryUpdateMethod: switchover
+      postgresql:
+        synchronous:
+          method: any
+          number: 1
+          dataDurability: required
+      backup:
+        target: prefer-standby
+        volumeSnapshot:
+          className: alibabacloud-disk-snapshot
+          online: false
+
+
+    ```
+
+??? example "on-demand-backup.yaml"
+
+    ```yaml
+    apiVersion: postgresql.cnpg.io/v1
+    kind: Backup
+    metadata:
+      name: echo-postgresql-on-demand-backup-01
+      namespace: cnpg-system
+    spec:
+      method: volumeSnapshot
+      cluster:
+        name: echo-postgresql
+    ```
+
+??? example "scheduled-backup.yaml"
+
+    ```yaml
+    apiVersion: postgresql.cnpg.io/v1
+    kind: ScheduledBackup
+    metadata:
+      name: echo-postgresql-daily-backup
+      namespace: cnpg-system
+    spec:
+      immediate: true
+      schedule: "0 0 0 * * *"
+      method: volumeSnapshot
+      cluster:
+        name: echo-postgresql
+    ```
+
 https://cloudnative-pg.io/documentation/1.26/backup/
 https://cloudnative-pg.io/documentation/1.26/cloudnative-pg.v1/#postgresql-cnpg-io-v1-VolumeSnapshotConfiguration
 https://cloudnative-pg.io/documentation/1.26/recovery/#how-recovery-works-under-the-hood

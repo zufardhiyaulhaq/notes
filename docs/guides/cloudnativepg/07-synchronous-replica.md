@@ -45,4 +45,32 @@ app=> SHOW wal_level;
 (1 row)
 ```
 
+## Manifests
+
+??? example "cluster.yaml"
+
+    ```yaml
+    apiVersion: postgresql.cnpg.io/v1
+    kind: Cluster
+    metadata:
+      name: echo-postgresql
+      namespace: cnpg-system
+    spec:
+      instances: 3
+      storage:
+        size: 20Gi
+        storageClass: gtf-ack-essd-pl0-wait
+      walStorage:
+        size: 1Gi
+        storageClass: gtf-ack-essd-pl0-wait
+      primaryUpdateStrategy: unsupervised
+      primaryUpdateMethod: switchover
+      postgresql:
+        synchronous:
+          method: any
+          number: 1
+          dataDurability: required
+
+    ```
+
 https://cloudnative-pg.io/documentation/1.26/replication/#synchronous-replication

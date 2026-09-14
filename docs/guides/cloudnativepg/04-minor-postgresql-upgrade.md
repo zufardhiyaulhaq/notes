@@ -96,3 +96,98 @@ https://cloudnative-pg.io/documentation/1.26/postgres_upgrades/
 
 ### Upgrade to unknown version
 when upgrading to unknown version, replica pod will start crashing due to image not found/etc. to fix this, just update the version to the correct version and delete the replica pod which is in error state
+
+## Manifests
+
+??? example "cluster.yaml"
+
+    ```yaml
+    apiVersion: postgresql.cnpg.io/v1
+    kind: Cluster
+    metadata:
+      name: echo-postgresql-upgrade-test
+      namespace: cnpg-system
+    spec:
+      imageName: ghcr.io/cloudnative-pg/postgresql:17.5
+      instances: 2
+      storage:
+        size: 1Gi
+        storageClass: gtf-ack-essd-pl0-wait
+      ## supervised upgrade strategy ##
+      # primaryUpdateStrategy: supervised
+      ## unsupervised upgrade strategy ##
+      primaryUpdateStrategy: unsupervised
+      primaryUpdateMethod: switchover
+    ```
+
+??? example "deployment.yaml"
+
+    ```yaml
+    apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: echo-postgresql-upgrade
+      namespace: cnpg-system
+      labels:
+        app: echo-postgresql-upgrade
+    spec:
+      replicas: 1
+      selector:
+        matchLabels:
+          app: echo-postgresql-upgrade
+      template:
+        metadata:
+          labels:
+            app: echo-postgresql-upgrade
+        spec:
+          containers:
+          - name: echo-postgresql-upgrade
+            image: ghcr.io/zufardhiyaulhaq/echo-postgresql:v1.0.0
+            ports:
+            - containerPort: 8080
+              name: http
+            env:
+            - name: HTTP_PORT
+              value: "8080"
+            - name: POSTGRESQL_HOST
+              value: "echo-postgresql-upgrade-test-rw.cnpg-system.svc.cluster.local"
+            - name: POSTGRESQL_PORT
+              value: "5432"
+            - name: POSTGRESQL_DATABASE
+              valueFrom:
+                secretKeyRef:
+                  name: echo-postgresql-upgrade-test-app
+                  key: dbname
+            - name: POSTGRESQL_USER
+              valueFrom:
+                secretKeyRef:
+                  name: echo-postgresql-upgrade-test-app
+                  key: user
+            - name: POSTGRESQL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: echo-postgresql-upgrade-test-app
+                  key: password
+            resources:
+              requests:
+                cpu: "100m"
+                memory: "128Mi"
+              limits:
+                cpu: "500m"
+                memory: "512Mi"
+    ---
+    apiVersion: v1
+    kind: Service
+    metadata:
+      name: echo-postgresql-upgrade
+      namespace: cnpg-system
+    spec:
+      selector:
+        app: echo-postgresql-upgrade
+      ports:
+        - protocol: TCP
+          port: 8080
+          targetPort: http
+      type: ClusterIP
+    ```
+

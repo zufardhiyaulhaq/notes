@@ -88,7 +88,109 @@ app=> SELECT * FROM echos WHERE echos.id = '5291e52a-7976-4bfd-8c2b-c24e17460633
 (0 rows)
 ```
 
+## Manifests
+
+??? example "cluster.yaml"
+
+    ```yaml
+    apiVersion: postgresql.cnpg.io/v1
+    kind: Cluster
+    metadata:
+      name: echo-postgresql
+      namespace: cnpg-system
+    spec:
+      instances: 4
+      storage:
+        size: 20Gi
+        storageClass: gtf-ack-essd-pl0-wait
+      walStorage:
+        size: 1Gi
+        storageClass: gtf-ack-essd-pl0-wait
+      primaryUpdateStrategy: unsupervised
+      primaryUpdateMethod: switchover
+      postgresql:
+        parameters:
+          archive_timeout: "10min"
+        synchronous:
+          method: any
+          number: 1
+          dataDurability: required
+      backup:
+        target: prefer-standby
+        volumeSnapshot:
+          className: alibabacloud-disk-snapshot
+          online: false
+      plugins:
+      - name: barman-cloud.cloudnative-pg.io
+        isWALArchiver: true
+        parameters:
+          barmanObjectName: s3-object-store-wal-archival
+      resources:
+        requests:
+          cpu: 100m
+          memory: 512Mi
+        limits:
+          cpu: 500m
+          memory: 1Gi
+
+
+    ```
+
+??? example "restore.yaml"
+
+    ```yaml
+    apiVersion: postgresql.cnpg.io/v1
+    kind: Cluster
+    metadata:
+      name: echo-postgresql-restore-pitr
+      namespace: cnpg-system
+    spec:
+      bootstrap:
+        recovery:
+          volumeSnapshots:
+            storage:
+              name: echo-postgresql-on-demand-backup-01
+              kind: VolumeSnapshot
+              apiGroup: snapshot.storage.k8s.io
+            walStorage:
+              name: echo-postgresql-on-demand-backup-01-wal
+              kind: VolumeSnapshot
+              apiGroup: snapshot.storage.k8s.io
+          source: pitr-object-storage
+      externalClusters:
+        - name: pitr-object-storage
+          plugin:
+            name: barman-cloud.cloudnative-pg.io
+            parameters:
+              barmanObjectName: s3-object-store-wal-archival
+              serverName: echo-postgresql
+      instances: 3
+      storage:
+        size: 20Gi
+        storageClass: gtf-ack-essd-pl0-wait
+      walStorage:
+        size: 1Gi
+        storageClass: gtf-ack-essd-pl0-wait
+      primaryUpdateStrategy: unsupervised
+      primaryUpdateMethod: switchover
+      postgresql:
+        parameters:
+          archive_timeout: "10min"
+        synchronous:
+          method: any
+          number: 1
+          dataDurability: required
+      resources:
+        requests:
+          cpu: 100m
+          memory: 512Mi
+        limits:
+          cpu: 500m
+          memory: 1Gi
+
+
+    ```
+
 https://cloudnative-pg.io/documentation/1.26/recovery/
 https://cloudnative-pg.io/documentation/1.26/wal_archiving/
 https://cloudnative-pg.io/documentation/1.26/backup/
-

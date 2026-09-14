@@ -46,4 +46,45 @@ k get pod echo-postgresql-14 -oyaml | grep resources -A 10
         memory: 512Mi
 ```
 
+## Manifests
+
+??? example "cluster.yaml"
+
+    ```yaml
+    apiVersion: postgresql.cnpg.io/v1
+    kind: Cluster
+    metadata:
+      name: echo-postgresql
+      namespace: cnpg-system
+    spec:
+      instances: 3
+      storage:
+        size: 20Gi
+        storageClass: gtf-ack-essd-pl0-wait
+      walStorage:
+        size: 1Gi
+        storageClass: gtf-ack-essd-pl0-wait
+      primaryUpdateStrategy: unsupervised
+      primaryUpdateMethod: switchover
+      postgresql:
+        synchronous:
+          method: any
+          number: 1
+          dataDurability: required
+      backup:
+        target: prefer-standby
+        volumeSnapshot:
+          className: alibabacloud-disk-snapshot
+          online: false
+      resources:
+        requests:
+          cpu: 100m
+          memory: 512Mi
+        limits:
+          cpu: 500m
+          memory: 1Gi
+
+
+    ```
+
 https://cloudnative-pg.io/documentation/1.26/cloudnative-pg.v1/#postgresql-cnpg-io-v1-ClusterSpec

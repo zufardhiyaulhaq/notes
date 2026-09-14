@@ -74,3 +74,37 @@ when creating a new replica with new storageclass, if PVC cannot be created with
 3. delete the new pod
 4. delete the job for new pod
    
+
+## Manifests
+
+??? example "cluster-revert.yaml"
+
+    ```yaml
+    apiVersion: postgresql.cnpg.io/v1
+    kind: Cluster
+    metadata:
+      name: echo-postgresql
+      namespace: cnpg-system
+    spec:
+      instances: 3
+      storage:
+        size: 20Gi
+        storageClass: gtf-ack-essd-pl0-wait
+
+    ```
+
+??? example "cluster.yaml"
+
+    ```yaml
+    apiVersion: postgresql.cnpg.io/v1
+    kind: Cluster
+    metadata:
+      name: echo-postgresql
+      namespace: cnpg-system
+    spec:
+      instances: 5
+      storage:
+        size: 20Gi
+        storageClass: gtf-ack-essd-pl1-wait
+    ```
+

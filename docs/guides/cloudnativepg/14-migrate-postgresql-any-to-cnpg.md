@@ -277,5 +277,226 @@ app=> select * from echos;
 4. completely deprecated your old/legacy database on VMs!
 
 ### Source
+
+## Manifests
+
+??? example "cluster.yaml"
+
+    ```yaml
+    ---
+    apiVersion: v1
+    kind: Secret
+    metadata:
+      name: cnpg-postgresql-publisher-creds
+      namespace: cnpg-system
+    data:
+      password: cmVwbF9wYXNzd29yZA==
+    ---
+    apiVersion: postgresql.cnpg.io/v1
+    kind: Cluster
+    metadata:
+      name: cnpg-postgresql-publisher
+      namespace: cnpg-system
+    spec:
+      instances: 2
+      externalClusters:
+      - name: legacy-postgresql-publisher
+        connectionParameters:
+          host: postgresql-publisher.cnpg-system.svc.cluster.local
+          user: logical_repl
+          dbname: echo
+        password:
+          name: cnpg-postgresql-publisher-creds
+          key: password
+      bootstrap:
+        initdb:
+          import:
+            type: microservice
+            schemaOnly: true
+            databases:
+              - echo
+            source:
+              externalCluster: legacy-postgresql-publisher
+      storage:
+        size: 10Gi
+        storageClass: gtf-ack-essd-pl0-wait
+      walStorage:
+        size: 1Gi
+        storageClass: gtf-ack-essd-pl0-wait
+      primaryUpdateStrategy: unsupervised
+      primaryUpdateMethod: switchover
+      postgresql:
+        parameters:
+          archive_timeout: "10min"
+        synchronous:
+          method: any
+          number: 1
+          dataDurability: required
+      backup:
+        target: prefer-standby
+        volumeSnapshot:
+          className: alibabacloud-disk-snapshot
+          online: false
+      plugins:
+      - name: barman-cloud.cloudnative-pg.io
+        isWALArchiver: true
+        parameters:
+          barmanObjectName: s3-object-store-wal-archival
+      resources:
+        requests:
+          cpu: 100m
+          memory: 512Mi
+        limits:
+          cpu: 500m
+          memory: 1Gi
+
+
+    ```
+
+??? example "deployment-before-migrate.yaml"
+
+    ```yaml
+    apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: deployment-migrate
+      namespace: cnpg-system
+      labels:
+        app: deployment-migrate
+    spec:
+      replicas: 1
+      selector:
+        matchLabels:
+          app: deployment-migrate
+      template:
+        metadata:
+          labels:
+            app: deployment-migrate
+        spec:
+          containers:
+          - name: deployment-migrate
+            image: ghcr.io/zufardhiyaulhaq/echo-postgresql:v1.0.1
+            ports:
+            - containerPort: 8080
+              name: http
+            env:
+            - name: HTTP_PORT
+              value: "8080"
+            - name: POSTGRESQL_HOST
+              value: "postgresql-publisher.cnpg-system.svc.cluster.local"
+            - name: POSTGRESQL_PORT
+              value: "5432"
+            - name: POSTGRESQL_DATABASE
+              value: "echo"
+            - name: POSTGRESQL_USER
+              value: "echo_user"
+            - name: POSTGRESQL_PASSWORD
+              value: "echo_password"
+            resources:
+              requests:
+                cpu: "100m"
+                memory: "128Mi"
+              limits:
+                cpu: "500m"
+                memory: "512Mi"
+    ---
+    apiVersion: v1
+    kind: Service
+    metadata:
+      name: deployment-migrate
+      namespace: cnpg-system
+    spec:
+      selector:
+        app: deployment-migrate
+      ports:
+        - protocol: TCP
+          port: 8080
+          targetPort: http
+      type: ClusterIP
+    ```
+
+??? example "postgresql.yaml"
+
+    ```yaml
+    apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: postgresql-publisher
+      namespace: cnpg-system
+    spec:
+      replicas: 1
+      selector:
+        matchLabels:
+          app: postgresql-publisher
+      template:
+        metadata:
+          labels:
+            app: postgresql-publisher
+        spec:
+          containers:
+          - name: postgresql
+            image: postgres:15
+            ports:
+            - containerPort: 5432
+            args: ["-c", "wal_level=logical"]
+            env:
+            - name: POSTGRES_DB
+              value: "echo"
+            - name: POSTGRES_USER
+              value: "echo_user"
+            - name: POSTGRES_PASSWORD
+              value: "echo_password"
+            volumeMounts:
+            - name: postgres-data
+              mountPath: /var/lib/postgresql/data
+              subPath: postgres-data
+          volumes:
+          - name: postgres-data
+            persistentVolumeClaim:
+              claimName: postgresql-publisher-pvc
+    ---
+    apiVersion: v1
+    kind: PersistentVolumeClaim
+    metadata:
+      name: postgresql-publisher-pvc
+      namespace: cnpg-system
+    spec:
+      accessModes:
+        - ReadWriteOnce
+      resources:
+        requests:
+          storage: 10Gi
+    ---
+    apiVersion: v1
+    kind: Service
+    metadata:
+      name: postgresql-publisher
+      namespace: cnpg-system
+    spec:
+      selector:
+        app: postgresql-publisher
+      ports:
+        - port: 5432
+          targetPort: 5432
+      type: ClusterIP
+    ```
+
+??? example "subscriber.yaml"
+
+    ```yaml
+    apiVersion: postgresql.cnpg.io/v1
+    kind: Subscription
+    metadata:
+      name: cnpg-postgresql-publisher
+      namespace: cnpg-system
+    spec:
+      cluster:
+        name: cnpg-postgresql-publisher
+      dbname: app
+      name: subscriber
+      externalClusterName: legacy-postgresql-publisher
+      publicationName: all_tables_pub
+    ```
+
 https://www.gabrielebartolini.it/articles/2024/03/cloudnativepg-recipe-5-how-to-migrate-your-postgresql-database-in-kubernetes-with-~0-downtime-from-anywhere/
 https://cloudnative-pg.io/documentation/1.26/bootstrap/#bootstrap-from-another-cluster

@@ -50,3 +50,22 @@ the default metrics and dashboard have provide lot of data for us to troubleshoo
 - lag metrics
 - connections metrics
 - configuration and extention metric
+
+## Manifests
+
+??? example "podmonitor.yaml"
+
+    ```yaml
+    apiVersion: monitoring.coreos.com/v1
+    kind: PodMonitor
+    metadata:
+      name: echo-postgresql-cnpg
+      namespace: cnpg-system
+    spec:
+      selector:
+        matchLabels:
+          cnpg.io/cluster: echo-postgresql
+      podMetricsEndpoints:
+      - port: metrics
+    ```
+
