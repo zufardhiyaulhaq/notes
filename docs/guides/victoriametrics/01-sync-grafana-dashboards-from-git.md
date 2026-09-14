@@ -11,7 +11,9 @@ tags:
 
 A dashboard you create or edit in the Grafana UI lives in Grafana's own database, on its PVC. Destroy the PVC or the Grafana pod and those dashboards are gone. The fix is to keep dashboards as code in Git and let the cluster re-provision them, so the running Grafana is disposable.
 
-There are two ways to get there. Grafana 11 and later (so also current Grafana 13) ship a newer **Git Sync** feature that connects Grafana directly to a Git repository, and Grafana Cloud has the same provisioning-as-code. This guide uses the other approach, the **Grafana dashboard sidecar**, because it delivers dashboards through the same GitOps pipeline that already reconciles the rest of the cluster. Git Sync is covered at the end as the alternative to consider.
+There are two ways to get there:
+1. Grafana 11 and later (so also current Grafana 13) ship a newer **Git Sync** feature that connects Grafana directly to a Git repository, and Grafana Cloud has the same provisioning-as-code.
+2. Dashboard json as configmap, the **Grafana dashboard sidecar** read dashboards from Kubernetes configmap, sync it to the VPC. you can store configmap anywhere on any repository. 
 
 This is written for the [victoria-metrics-k8s-stack](https://github.com/VictoriaMetrics/helm-charts/tree/master/charts/victoria-metrics-k8s-stack) chart, which bundles the upstream Grafana Helm chart, but it applies to any install of that Grafana chart.
 
@@ -115,8 +117,6 @@ When you export a dashboard from Grafana, pick the model that uses a **datasourc
 
 Now the same JSON works in any cluster and the reader just picks the datasource from a dropdown at the top of the dashboard.
 
-Watch for `__inputs` and `DS_` placeholders. An export sometimes wraps the datasource in an `__inputs` block with a `DS_PROMETHEUS` placeholder that expects substitution at import time. A clean model that uses a `datasource` template variable has none of that, so it provisions as-is with no extra find-and-replace step.
-
 ## The durability payoff
 
 Once dashboards are ConfigMaps in Git:
@@ -127,9 +127,9 @@ Once dashboards are ConfigMaps in Git:
 
 Dashboards become disposable and reproducible. The source of truth is the JSON in Git, not a database on a volume.
 
-## Gotchas
+## Notes
 
-| Gotcha | What to do |
+| Notes | What to do |
 |---|---|
 | **ConfigMap size limit** is about 1 MB (etcd / kine). A very large single dashboard can exceed it. | Gzip the JSON (the sidecar decompresses gzip content) or split the dashboard. |
 | **Namespace scope.** By default the sidecar only watches its own namespace. | Set `searchNamespace: ALL` on the sidecar to watch every namespace. |
@@ -161,7 +161,9 @@ Dashboards become disposable and reproducible. The source of truth is the JSON i
 
 ## Alternative: Git Sync (Grafana 11+)
 
-Grafana 11 and 12 and later, and Grafana Cloud, can connect Grafana directly to a Git repository and sync dashboards from it. It runs on Grafana's newer app-platform and unified storage layer. The headline difference from the sidecar is that Git Sync is **bidirectional**: a dashboard edited in the UI can be written back to Git through a branch and pull-request workflow, so the UI and the repo stay in step.
+Grafana 11 and 12 and later, and Grafana Cloud, can connect Grafana directly to a Git repository and sync dashboards from it. It runs on Grafana's newer app-platform and unified storage layer. 
+
+The headline difference from the sidecar is that Git Sync is **bidirectional**: a dashboard edited in the UI can be written back to Git through a branch and pull-request workflow, so the UI and the repo stay in step.
 
 It is still a preview and experimental feature. It sits behind feature flags, and the APIs and behavior are still changing between releases, so pin your Grafana version and expect to revisit the setup as it stabilizes.
 
