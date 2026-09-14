@@ -41,5 +41,27 @@ echo-postgresql-14                         1/1     Running       0          2m10
 echo-postgresql-15                         1/1     Running       0          2m46s
 ```
 
+## Manifests
+
+??? example "cluster.yaml"
+
+    ```yaml
+    apiVersion: postgresql.cnpg.io/v1
+    kind: Cluster
+    metadata:
+      name: echo-postgresql
+      namespace: cnpg-system
+    spec:
+      instances: 3
+      storage:
+        size: 20Gi
+        storageClass: gtf-ack-essd-pl0-wait
+      walStorage:
+        size: 1Gi
+        storageClass: gtf-ack-essd-pl0-wait
+      primaryUpdateStrategy: unsupervised
+      primaryUpdateMethod: switchover
+
+    ```
 
 https://cloudnative-pg.io/documentation/1.26/storage/#volume-for-wal

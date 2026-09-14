@@ -281,3 +281,319 @@ app=# select * from echos;
 
 app=# 
 ```
+
+## Manifests
+
+??? example "cluster-16-9-publication.yaml"
+
+    ```yaml
+
+    apiVersion: postgresql.cnpg.io/v1
+    kind: Publication
+    metadata:
+      name: echo-postgresql-16-9-publisher
+    spec:
+      cluster:
+        name: echo-postgresql-16-9
+      dbname: app
+      name: echo-postgresql-16-9-publisher
+      target:
+        allTables: true
+    ```
+
+??? example "cluster-18-0-subscription.yaml"
+
+    ```yaml
+
+    ---
+    apiVersion: postgresql.cnpg.io/v1
+    kind: Subscription
+    metadata:
+      name: echo-postgresql-18-0-subscription
+    spec:
+      cluster:
+        name: echo-postgresql-18-0
+      dbname: app
+      name: subscriber
+      externalClusterName: echo-postgresql-16-9
+      publicationName: echo-postgresql-16-9-publisher
+    ```
+
+??? example "cluster16-9.yaml"
+
+    ```yaml
+    ---
+    apiVersion: v1
+    kind: Secret
+    metadata:
+      name: echo-postgresql-16-9-logical-replication-creds
+      namespace: cnpg-system
+      labels:
+        cnpg.io/reload: "true"
+    data:
+      username: bG9naWNhbF9yZXBsaWNhdGlvbg==
+      password: bG9naWNhbF9yZXBsaWNhdGlvbg==
+    type: kubernetes.io/basic-auth
+    ---
+    apiVersion: postgresql.cnpg.io/v1
+    kind: Cluster
+    metadata:
+      name: echo-postgresql-16-9
+      namespace: cnpg-system
+    spec:
+      imageName: ghcr.io/cloudnative-pg/postgresql:16.9
+      instances: 2
+      storage:
+        size: 1Gi
+        storageClass: gtf-ack-essd-pl0-wait
+      managed:
+        roles:
+          - name: logical_replication
+            login: true
+            replication: true
+            ensure: present
+            passwordSecret:
+              name: echo-postgresql-16-9-logical-replication-creds
+            inRoles:
+              - app
+      walStorage:
+        size: 1Gi
+        storageClass: gtf-ack-essd-pl0-wait
+      primaryUpdateStrategy: unsupervised
+      primaryUpdateMethod: switchover
+      postgresql:
+        parameters:
+          archive_timeout: "10min"
+        synchronous:
+          method: any
+          number: 1
+          dataDurability: required
+      backup:
+        target: prefer-standby
+        volumeSnapshot:
+          className: alibabacloud-disk-snapshot
+          online: false
+      plugins:
+      - name: barman-cloud.cloudnative-pg.io
+        isWALArchiver: true
+        parameters:
+          barmanObjectName: s3-object-store-wal-archival
+      resources:
+        requests:
+          cpu: 100m
+          memory: 512Mi
+        limits:
+          cpu: 500m
+          memory: 1Gi
+
+
+    ```
+
+??? example "cluster18-0.yaml"
+
+    ```yaml
+
+    apiVersion: postgresql.cnpg.io/v1
+    kind: Cluster
+    metadata:
+      name: echo-postgresql-18-0
+      namespace: cnpg-system
+    spec:
+      imageName: ghcr.io/cloudnative-pg/postgresql:18.0
+      instances: 2
+      externalClusters:
+      - name: echo-postgresql-16-9
+        connectionParameters:
+          host: echo-postgresql-16-9-rw.cnpg-system.svc.cluster.local
+          user: logical_replication
+          dbname: app
+        password:
+          name: echo-postgresql-16-9-logical-replication-creds
+          key: password
+      bootstrap:
+        initdb:
+          import:
+            type: microservice
+            schemaOnly: true
+            databases:
+              - app
+            source:
+              externalCluster: echo-postgresql-16-9
+      storage:
+        size: 1Gi
+        storageClass: gtf-ack-essd-pl0-wait
+      walStorage:
+        size: 1Gi
+        storageClass: gtf-ack-essd-pl0-wait
+      primaryUpdateStrategy: unsupervised
+      primaryUpdateMethod: switchover
+      postgresql:
+        parameters:
+          archive_timeout: "10min"
+        synchronous:
+          method: any
+          number: 1
+          dataDurability: required
+      backup:
+        target: prefer-standby
+        volumeSnapshot:
+          className: alibabacloud-disk-snapshot
+          online: false
+      plugins:
+      - name: barman-cloud.cloudnative-pg.io
+        isWALArchiver: true
+        parameters:
+          barmanObjectName: s3-object-store-wal-archival
+      resources:
+        requests:
+          cpu: 100m
+          memory: 512Mi
+        limits:
+          cpu: 500m
+          memory: 1Gi
+
+
+    ```
+
+??? example "deployment-16-9.yaml"
+
+    ```yaml
+    apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: echo-postgresql-upgrade
+      namespace: cnpg-system
+      labels:
+        app: echo-postgresql-upgrade
+    spec:
+      replicas: 1
+      selector:
+        matchLabels:
+          app: echo-postgresql-upgrade
+      template:
+        metadata:
+          labels:
+            app: echo-postgresql-upgrade
+        spec:
+          containers:
+          - name: echo-postgresql-upgrade
+            image: ghcr.io/zufardhiyaulhaq/echo-postgresql:v1.0.1
+            ports:
+            - containerPort: 8080
+              name: http
+            env:
+            - name: HTTP_PORT
+              value: "8080"
+            - name: POSTGRESQL_HOST
+              value: "echo-postgresql-16-9-rw.cnpg-system.svc.cluster.local"
+            - name: POSTGRESQL_PORT
+              value: "5432"
+            - name: POSTGRESQL_DATABASE
+              valueFrom:
+                secretKeyRef:
+                  name: echo-postgresql-16-9-app
+                  key: dbname
+            - name: POSTGRESQL_USER
+              valueFrom:
+                secretKeyRef:
+                  name: echo-postgresql-16-9-app
+                  key: user
+            - name: POSTGRESQL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: echo-postgresql-16-9-app
+                  key: password
+            resources:
+              requests:
+                cpu: "100m"
+                memory: "128Mi"
+              limits:
+                cpu: "500m"
+                memory: "512Mi"
+    ---
+    apiVersion: v1
+    kind: Service
+    metadata:
+      name: echo-postgresql-upgrade
+      namespace: cnpg-system
+    spec:
+      selector:
+        app: echo-postgresql-upgrade
+      ports:
+        - protocol: TCP
+          port: 8080
+          targetPort: http
+      type: ClusterIP
+    ```
+
+??? example "deployment-18-0.yaml"
+
+    ```yaml
+    apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: echo-postgresql-upgrade
+      namespace: cnpg-system
+      labels:
+        app: echo-postgresql-upgrade
+    spec:
+      replicas: 1
+      selector:
+        matchLabels:
+          app: echo-postgresql-upgrade
+      template:
+        metadata:
+          labels:
+            app: echo-postgresql-upgrade
+        spec:
+          containers:
+          - name: echo-postgresql-upgrade
+            image: ghcr.io/zufardhiyaulhaq/echo-postgresql:v1.0.1
+            ports:
+            - containerPort: 8080
+              name: http
+            env:
+            - name: HTTP_PORT
+              value: "8080"
+            - name: POSTGRESQL_HOST
+              value: "echo-postgresql-18-0-rw.cnpg-system.svc.cluster.local"
+            - name: POSTGRESQL_PORT
+              value: "5432"
+            - name: POSTGRESQL_DATABASE
+              valueFrom:
+                secretKeyRef:
+                  name: echo-postgresql-18-0-app
+                  key: dbname
+            - name: POSTGRESQL_USER
+              valueFrom:
+                secretKeyRef:
+                  name: echo-postgresql-18-0-app
+                  key: user
+            - name: POSTGRESQL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: echo-postgresql-18-0-app
+                  key: password
+            resources:
+              requests:
+                cpu: "100m"
+                memory: "128Mi"
+              limits:
+                cpu: "500m"
+                memory: "512Mi"
+    ---
+    apiVersion: v1
+    kind: Service
+    metadata:
+      name: echo-postgresql-upgrade
+      namespace: cnpg-system
+    spec:
+      selector:
+        app: echo-postgresql-upgrade
+      ports:
+        - protocol: TCP
+          port: 8080
+          targetPort: http
+      type: ClusterIP
+    ```
+

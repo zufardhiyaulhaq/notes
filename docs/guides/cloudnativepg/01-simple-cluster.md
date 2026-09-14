@@ -87,6 +87,92 @@ app=> select * from echos;
  2025-07-04 15:01:51.401685+00 | 2025-07-04 15:01:51.399392+00 |            | c72a1b22-4660-4cd8-9c75-808335729df5 | test
 ```
 
+## Manifests
+
+??? example "cluster.yaml"
+
+    ```yaml
+    apiVersion: postgresql.cnpg.io/v1
+    kind: Cluster
+    metadata:
+      name: echo-postgresql
+      namespace: cnpg-system
+    spec:
+      instances: 4
+      storage:
+        size: 1Gi
+    ```
+
+??? example "deployment.yaml"
+
+    ```yaml
+    apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: echo-postgresql
+      namespace: cnpg-system
+      labels:
+        app: echo-postgresql
+    spec:
+      replicas: 1
+      selector:
+        matchLabels:
+          app: echo-postgresql
+      template:
+        metadata:
+          labels:
+            app: echo-postgresql
+        spec:
+          containers:
+          - name: echo-postgresql
+            image: ghcr.io/zufardhiyaulhaq/echo-postgresql:v1.0.0
+            ports:
+            - containerPort: 8080
+              name: http
+            env:
+            - name: HTTP_PORT
+              value: "8080"
+            - name: POSTGRESQL_HOST
+              value: "echo-postgresql-rw.cnpg-system.svc.cluster.local"
+            - name: POSTGRESQL_PORT
+              value: "5432"
+            - name: POSTGRESQL_DATABASE
+              valueFrom:
+                secretKeyRef:
+                  name: echo-postgresql-app
+                  key: dbname
+            - name: POSTGRESQL_USER
+              valueFrom:
+                secretKeyRef:
+                  name: echo-postgresql-app
+                  key: user
+            - name: POSTGRESQL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: echo-postgresql-app
+                  key: password
+            resources:
+              requests:
+                cpu: "100m"
+                memory: "128Mi"
+              limits:
+                cpu: "500m"
+                memory: "512Mi"
+    ---
+    apiVersion: v1
+    kind: Service
+    metadata:
+      name: echo-postgresql
+      namespace: cnpg-system
+    spec:
+      selector:
+        app: echo-postgresql
+      ports:
+        - protocol: TCP
+          port: 8080
+          targetPort: http
+      type: ClusterIP
+    ```
 
 https://cloudnative-pg.io/documentation/1.26/quickstart/
 https://cloudnative-pg.io/documentation/1.26/applications/

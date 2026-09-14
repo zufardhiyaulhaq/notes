@@ -98,3 +98,31 @@ echo-postgresql-4                               2/2     Running       0         
 ```
 
 there is differences on pod Init Container which using cloudnative-pg:1.26.1, instead of using 1.26.0.
+
+## Manifests
+
+??? example "cnpg-operator-helm-value.yaml"
+
+    ```yaml
+    replicaCount: 3
+
+    image:
+      repository: ghcr.io/cloudnative-pg/cloudnative-pg
+      pullPolicy: IfNotPresent
+
+    crds:
+      create: true
+
+    monitoring:
+      podMonitorEnabled: true
+
+    config:
+      data: 
+        ENABLE_INSTANCE_MANAGER_INPLACE_UPDATES: 'true'
+        CLUSTERS_ROLLOUT_DELAY: '60'
+        INSTANCES_ROLLOUT_DELAY: '10'
+        CERTIFICATE_DURATION: '2160h'
+        EXPIRING_CHECK_THRESHOLD: '720h'
+        KUBERNETES_CLUSTER_DOMAIN: 'cluster.local'
+    ```
+

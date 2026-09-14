@@ -55,4 +55,163 @@ k logs echo-postgresql-14 -c plugin-barman-cloud -f --tail 10
 {"level":"info","ts":"2025-07-13T05:15:44.062401857Z","msg":"Skipping retention policy enforcement, not the current primary","logging_pod":"echo-postgresql-14","currentPrimary":"echo-postgresql-15","podName":"echo-postgresql-14"}
 ```
 
+## Manifests
+
+??? example "cluster.yaml"
+
+    ```yaml
+    apiVersion: postgresql.cnpg.io/v1
+    kind: Cluster
+    metadata:
+      name: echo-postgresql
+      namespace: cnpg-system
+    spec:
+      instances: 3
+      storage:
+        size: 20Gi
+        storageClass: gtf-ack-essd-pl0-wait
+      walStorage:
+        size: 1Gi
+        storageClass: gtf-ack-essd-pl0-wait
+      primaryUpdateStrategy: unsupervised
+      primaryUpdateMethod: switchover
+      postgresql:
+        synchronous:
+          method: any
+          number: 1
+          dataDurability: required
+      backup:
+        target: prefer-standby
+        volumeSnapshot:
+          className: alibabacloud-disk-snapshot
+          online: false
+      plugins:
+      - name: barman-cloud.cloudnative-pg.io
+        isWALArchiver: true
+        parameters:
+          barmanObjectName: s3-object-store-wal-archival
+      resources:
+        requests:
+          cpu: 100m
+          memory: 512Mi
+        limits:
+          cpu: 500m
+          memory: 1Gi
+
+
+    ```
+
+??? example "minio-example.yaml"
+
+    ```yaml
+    ---
+    apiVersion: v1
+    kind: Service
+    metadata:
+      name: minio
+    spec:
+      type: ClusterIP
+      ports:
+        - name: http
+          port: 9000
+          targetPort: 9000
+        - name: console
+          port: 9001
+          targetPort: 9001
+      selector:
+        app: minio
+    ---
+    apiVersion: v1
+    kind: PersistentVolumeClaim
+    metadata:
+      name: minio-pvc
+      labels:
+        app: minio-pvc
+    spec:
+      accessModes:
+        - ReadWriteOnce
+      storageClassName: gtf-ack-essd-pl0-wait
+      resources:
+        requests:
+          storage: 10Gi
+    ---
+    apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: minio
+      labels:
+        app: minio
+    spec:
+      selector:
+        matchLabels:
+          app: minio
+      strategy:
+        type: Recreate
+      template:
+        metadata:
+          labels:
+            app: minio
+        spec:
+          containers:
+          - name: minio
+            image: minio/minio:latest
+            args:
+            - server
+            - /data
+            - --console-address
+            - ":9001"
+            env:
+            - name: MINIO_ROOT_USER
+              value: "minioadmin"
+            - name: MINIO_ROOT_PASSWORD
+              value: "minioadmin"
+            ports:
+            - containerPort: 9000
+            - containerPort: 9001
+            volumeMounts:
+            - name: storage
+              mountPath: "/data"
+          volumes:
+          - name: storage
+            persistentVolumeClaim:
+              claimName: minio-pvc
+    ```
+
+??? example "object-store-example.yaml"
+
+    ```yaml
+    apiVersion: barmancloud.cnpg.io/v1
+    kind: ObjectStore
+    metadata:
+      name: s3-object-store-wal-archival
+      namespace: cnpg-system
+    spec:
+      configuration:
+        destinationPath: "s3://wal-archival/"
+        endpointURL: "http://minio:9000/"
+        s3Credentials:
+          accessKeyId:
+            name: minio-wal-archival-creds
+            key: ACCESS_KEY_ID
+          secretAccessKey:
+            name: minio-wal-archival-creds
+            key: ACCESS_SECRET_KEY
+        wal:
+          compression: gzip
+      retentionPolicy: "30d"
+    ```
+
+??? example "secret-example.yaml"
+
+    ```yaml
+    apiVersion: v1
+    kind: Secret
+    metadata:
+      name: minio-wal-archival-creds
+      namespace: cnpg-system
+    data:
+      ACCESS_KEY_ID: base64-encoded-access-key-id
+      ACCESS_SECRET_KEY: base64-encoded-secret-key
+    ```
+
 https://cloudnative-pg.io/documentation/1.26/wal_archiving/

@@ -41,4 +41,20 @@ Events:
   Normal   FileSystemResizeSuccessful  102s  kubelet                                           MountVolume.NodeExpandVolume succeeded for volume "d-k1abj0np1naq984llm6a" ap-southeast-5.10.195.169.24
 ```
 
+## Manifests
+
+??? example "cluster.yaml"
+
+    ```yaml
+    apiVersion: postgresql.cnpg.io/v1
+    kind: Cluster
+    metadata:
+      name: echo-postgresql
+      namespace: cnpg-system
+    spec:
+      instances: 4
+      storage:
+        size: 2Gi
+    ```
+
 https://cloudnative-pg.io/documentation/1.26/controller/#pvc-resizing
