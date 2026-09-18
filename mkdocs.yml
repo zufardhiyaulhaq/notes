@@ -71,6 +71,26 @@ plugins:
       post_readtime: true
       archive: true
       categories: true
+  - rss:
+      match_path: "til/posts/.*"
+      categories:
+        - categories
+        - tags
+      date_from_meta:
+        as_creation: date
+  - llmstxt:
+      markdown_description: >-
+        Working notes by Zufar Dhiyaulhaq: TIL (today I learned) entries and
+        engineering guides on Kubernetes, service mesh, databases, and cloud
+        infrastructure.
+      full_output: llms-full.txt
+      sections:
+        Start here:
+          - index.md
+        Guides:
+          - guides/*/*.md
+        TIL:
+          - til/posts/*.md
 
 markdown_extensions:
   - abbr
