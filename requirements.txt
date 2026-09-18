@@ -1,3 +1,5 @@
 mkdocs-material>=9.5,<10
 mkdocs-awesome-pages-plugin
 mkdocs-jupyter
+mkdocs-rss-plugin>=1.17
+mkdocs-llmstxt>=0.5
