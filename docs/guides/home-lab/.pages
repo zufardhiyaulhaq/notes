@@ -1,0 +1,4 @@
+title: Home Lab
+nav:
+  - index.md
+  - 01-k3s-cluster-setup.md

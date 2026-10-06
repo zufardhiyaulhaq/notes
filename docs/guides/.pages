@@ -1,6 +1,7 @@
 title: Guides
 nav:
   - index.md
+  - home-lab
   - engineering-notes
   - cloudnativepg
   - victoriametrics
