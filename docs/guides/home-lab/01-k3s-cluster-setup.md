@@ -6,7 +6,7 @@ tags:
   - raspberry-pi
 ---
 
-# k3s on Raspberry Pi over WiFi
+# Kubernetes installation with k3s
 
 My home-lab is a five-node k3s cluster on Raspberry Pi 4B boards: one server and four workers, about 34 GiB RAM and 20 cores between them. It runs my own workloads and is where I practice Kubernetes. The boards are on WiFi for now; wired ethernet is planned but not in place yet, so the whole design assumes the network can change under it.
 
