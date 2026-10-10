@@ -4,6 +4,7 @@ nav:
   - home-lab
   - engineering-notes
   - cloudnativepg
+  - vcluster
   - victoriametrics
   - keda
   - vLLM: vllm
