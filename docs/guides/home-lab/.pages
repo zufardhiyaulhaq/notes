@@ -2,3 +2,9 @@ title: Home Lab
 nav:
   - index.md
   - 01-k3s-cluster-setup.md
+  - 02-remote-access-with-frp.md
+  - 03-gitops-with-argocd.md
+  - 04-istio-service-mesh-and-ingress.md
+  - 05-exposing-web-services-with-frp.md
+  - 06-node-dns-and-coredns.md
+  - 07-backup-access-with-tailscale.md
