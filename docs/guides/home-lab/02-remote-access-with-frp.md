@@ -9,13 +9,13 @@ tags:
 
 # Remote access with frp reverse tunnels
 
-The cluster sits on a home network: behind a router, on WiFi, NAT, no public IP, no port forwarding. I still want to SSH to every board and run `kubectl` against the API from anywhere, without opening the router. frp reverse tunnels do exactly that. Each board dials **out** to a public relay, and the relay exposes a port that routes back in, so the home network never has to accept an inbound connection.
+The boards sit behind residential NAT with no public IP and no port forwarding, so **nothing on the internet can open a connection to them.** I still need SSH to every board and `kubectl` against the API from anywhere, without opening the home router. frp reverse tunnels do it: each board dials out to a public relay, and the relay routes connections back in.
 
 ## How it works
 
-A cheap public VM (anything with a routable IP) runs the frp server, `frps`. Each board runs the frp client, `frpc`, which dials out to that VM and keeps the connection open. Because the board opens the connection, there is no inbound path into the home network to secure.
+A cheap public VM runs the frp server, `frps`. Each board runs the frp client, `frpc`, which dials out to that VM and holds the connection open. **The board opens the connection, so there is no inbound path into the home network to secure.**
 
-The relay does not have to be dedicated. Mine shares a box with other services, so `frps` runs as its own sandboxed systemd user, and an `allowPorts` allowlist caps what any client is allowed to request:
+The relay does not have to be dedicated. Mine shares a box with other services, so `frps` runs as its own sandboxed systemd user, and an `allowPorts` allowlist caps what any client can request:
 
 ```toml
 # frps.toml
@@ -39,13 +39,13 @@ flowchart LR
     frps["frps<br/>:7000, :2201-2205, :6443"]
   end
   me["Me<br/>ssh / kubectl"]
-  pi -- "dials out, keeps open" --> frps
+  pi -- "dials out, holds open" --> frps
   me -- "ssh -p 2201 / kubectl :6443" --> frps
 ```
 
 ## SSH: one tunnel per board
 
-Each `frpc` maps the board's local `22` to a dedicated remote port on the relay. I reach a board as `ssh -p <port> <user>@<relay>`, aliased to `rpi-N` in `~/.ssh/config`.
+Each `frpc` maps the board's local `22` to a dedicated remote port. I reach a board as `ssh -p <port> <user>@<relay>`, aliased to `rpi-N` in `~/.ssh/config`.
 
 | Board | LAN IP | SSH remote port |
 |---|---|---|
@@ -74,7 +74,7 @@ transport.useCompression = true
 
 ## Kubernetes API: one extra tunnel on the control plane
 
-The control-plane board runs one more proxy, `127.0.0.1:6443` to the relay's `:6443`. Combined with the split-horizon DNS from the [cluster setup](01-k3s-cluster-setup.md) (the name resolves to the LAN IP on-network and to the relay off-network), `k8s.lab.example.com` points at the relay when I am away, so remote `kubectl` works with real TLS. The API-server certificate already carries that name in its SAN, so nothing has to be skipped or overridden. If you need a scoped credential rather than the admin kubeconfig, see [a kubeconfig from a ServiceAccount](../engineering-notes/kubeconfig-from-service-account.md).
+The control-plane board runs one more proxy, `127.0.0.1:6443` to the relay's `:6443`. With the split-horizon DNS from the [cluster setup](01-k3s-cluster-setup.md), `k8s.lab.example.com` resolves to the relay when I am away, so remote `kubectl` works with real TLS: **the API-server certificate already carries that name in its SAN**, so nothing is skipped or overridden. For a scoped credential instead of the admin kubeconfig, see [a kubeconfig from a ServiceAccount](../engineering-notes/kubeconfig-from-service-account.md).
 
 ## Three layers of auth
 
@@ -82,16 +82,16 @@ Nothing rides on the tunnel alone:
 
 - **frp:** token auth plus forced TLS on the control channel.
 - **SSH:** public-key only, root login disabled, `AllowUsers` restricted to one account.
-- **API:** mutual TLS, the client certificate living in the kubeconfig.
+- **API:** mutual TLS, the client certificate in the kubeconfig.
 
-On the relay, open the firewall only for the frp port (`7000`), the SSH port range, and `6443`. Nothing else needs to answer.
+On the relay, open the firewall only for the frp port (`7000`), the SSH range (`2201-2205`), and `6443`. Nothing else answers.
 
 ## Trade-offs
 
 - **The relay is a single point of failure.** If the VM or `frps` is down, all remote access is down. A separate break-glass path ([Tailscale](07-backup-access-with-tailscale.md)) covers that case.
 - **The API port answers to the public internet.** mTLS gates every request and the admin credential never leaves my laptop, but `6443` is reachable from the world. Scope it to known source IPs in the relay's firewall where you can.
-- **The frp token is a shared secret** across the server config and every client config. Rotating it means editing all of them and restarting.
-- **On-LAN access hairpins.** From the home WiFi, the public name still routes out to the relay and back instead of straight to the LAN IP. A local `/etc/hosts` entry on my laptop avoids the round trip when it matters.
+- **The frp token is a shared secret** across the server config and every client config. Rotating it means editing all six and restarting.
+- **On-LAN access hairpins** out to the relay and back instead of straight to the LAN IP. A local `/etc/hosts` entry on my laptop avoids the round trip when it matters.
 
 ## Sources
 
