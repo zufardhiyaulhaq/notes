@@ -8,7 +8,7 @@ tags:
 
 # Kubernetes installation with k3s
 
-My home-lab is a five-node k3s cluster on Raspberry Pi 4B boards: one server and four workers, about 34 GiB RAM and 20 cores between them. It runs my own workloads and is where I practice Kubernetes. The boards are on WiFi for now; wired ethernet is planned but not in place yet, so the whole design assumes the network can change under it.
+Five Raspberry Pi 4B boards run a single-server k3s cluster, v1.36.3+k3s1: one control plane and four workers, ~34 GiB RAM and 20 cores between them. It runs my own workloads and is where I practice Kubernetes. Every board is on WiFi today, `eth0` unwired, so **the whole design assumes the network can change under it.**
 
 | Node | Role | RAM | Node IP (wlan0) |
 |---|---|---|---|
@@ -20,11 +20,11 @@ My home-lab is a five-node k3s cluster on Raspberry Pi 4B boards: one server and
 
 ## Design decisions
 
-- **Flannel pinned to `wlan0`.** The nodes are on WiFi, so the CNI stays on the WiFi interface and never touches the host routing table: `--flannel-iface=wlan0 --node-ip=<node-ip>`.
-- **The API is a DNS name, not an IP.** `k8s.lab.example.com` resolves split-horizon: `/etc/hosts` on each node points it at the LAN IP, and a public record points it at a reverse tunnel so remote `kubectl` works over the tunnel on `6443`. Every identity the API server could answer to, including the IP it will have once wired to ethernet, is pre-loaded into the server certificate (the `--tls-san` flags in the install below), so an IP or interface change never re-issues certs. Workers join by the DNS name too, so the move to ethernet later is just an `/etc/hosts` edit plus a `--node-ip` / `--flannel-iface=eth0` change and a restart: no re-issued certificates, no worker rejoin.
+- **Flannel pinned to `wlan0`.** The CNI stays on the WiFi interface and never touches the host routing table: `--flannel-iface=wlan0 --node-ip=<node-ip>`.
+- **The API is a DNS name, not an IP.** `k8s.lab.example.com` resolves split-horizon: `/etc/hosts` on each node points it at the LAN IP, a public record points it at a reverse tunnel so remote `kubectl` works over the tunnel on `6443`. Every identity the API server can answer to, including the `eth0` IP it will have once wired, is pre-loaded into the server certificate (the `--tls-san` flags below). An IP or interface change never re-issues certs. Workers join by the DNS name too, so the move to ethernet later is an `/etc/hosts` edit plus `--node-ip` / `--flannel-iface=eth0` and a restart. No re-issued certificates, no worker rejoin.
 - **Minimal components.** Keep CoreDNS, metrics-server, local-path (the default StorageClass), and network-policy. Disable Traefik, ServiceLB, and helm-controller, and bring my own (Istio for ingress).
-- **local-path for storage.** A PVC is just a directory on whichever node the pod lands on. Zero-config, but not replicated (see trade-offs).
-- **The control-plane board is tainted.** It is the 4 GB board, and when application pods landed on it they starved the API server (slow `kubectl`, lost leader leases). Taint it so workloads stay on the four 8 GB workers: `kubectl taint node rpi-1 node-role.kubernetes.io/control-plane=:NoSchedule`. k3s system pods (CoreDNS, local-path-provisioner, metrics-server) tolerate it and keep running there. It is a scheduling fence, not HA. See [k3s leaves the control plane schedulable](../../til/posts/2026-09-12-k3s-leaves-the-control-plane-schedulable.md) for the why and the drain/uncordon it needs.
+- **local-path for storage.** A PVC is a directory on whichever node the pod lands on. Zero-config, not replicated (see trade-offs).
+- **The control-plane board is tainted.** It is the 4 GB board, 3.7 GiB allocatable against 7.6 GiB on each worker. When application pods landed on it they starved the API server: slow `kubectl`, lost leader leases. Taint it so workloads stay on the four 8 GB workers: `kubectl taint node rpi-1 node-role.kubernetes.io/control-plane=:NoSchedule`. k3s system pods (CoreDNS, local-path-provisioner, metrics-server) tolerate it and keep running there. **It is a scheduling fence, not HA.** See [k3s leaves the control plane schedulable](../../til/posts/2026-09-12-k3s-leaves-the-control-plane-schedulable.md) for the why and the drain/uncordon it needs.
 
 ## The install
 
@@ -46,13 +46,13 @@ curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION=v1.36.3+k3s1 \
   sh -s - agent --node-ip=192.168.1.11 --flannel-iface=wlan0
 ```
 
-Then taint the server (above). The node token is on the server at `/var/lib/rancher/k3s/server/node-token`.
+Then taint the server. The node token is on the server at `/var/lib/rancher/k3s/server/node-token`.
 
 ## Trade-offs
 
-- **No HA.** One control-plane node; if it is down, the API is down until it returns.
+- **No HA.** One control-plane node. If it is down, the API is down until it returns.
 - **local-path is not replicated.** If a node dies, its PVC data is stranded and the pod cannot reschedule with it. More workers widen where a PVC can land, not whether it can move.
-- **`/etc/hosts` must stay in sync** across every node, since the split-horizon name lives there, not in DNS.
+- **`/etc/hosts` must stay in sync** across all five nodes, since the split-horizon name lives there, not in DNS.
 
 ## Sources
 

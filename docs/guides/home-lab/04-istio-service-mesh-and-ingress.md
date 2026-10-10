@@ -9,18 +9,18 @@ tags:
 
 # Service mesh and ingress with Istio
 
-Istio does two jobs in the cluster: the service mesh (mTLS and sidecars between workloads) and the platform ingress that fronts every public app. It is installed and upgraded GitOps-style from the same repo as everything else ([GitOps with ArgoCD](03-gitops-with-argocd.md)). The public traffic reaches the gateway over an frp tunnel ([exposing web services](05-exposing-web-services-with-frp.md)); this guide is about how the mesh and the gateways themselves are installed.
+Istio does two jobs in the cluster: the service mesh (mTLS and sidecars between workloads) and the platform ingress that fronts every public app. Both are installed and upgraded GitOps-style from the same repo as everything else ([GitOps with ArgoCD](03-gitops-with-argocd.md)), and the public traffic reaches the gateway over an frp tunnel ([exposing web services](05-exposing-web-services-with-frp.md)).
 
-Two constraints shaped it. The cluster is a five-node Pi lab, so every component is right-sized down from the reference manifests. And Istio is moving its images off its old registries onto Docker Hub, whose anonymous pull limit (200 pulls per 6 hours per IP) is untenable behind a single home NAT.
+Two constraints shaped it. The cluster is a five-node Pi lab, so every component is right-sized down from the reference manifests. And **Istio is moving its images onto Docker Hub, whose 200-pull / 6h anonymous limit per IP is untenable behind a single home NAT.**
 
 ## Install as a revision
 
 1. **Version and revision are single-sourced.** A config file holds `istio.version: 1.30.4` and `istio.revision: 1-30-4` (the version dots become revision dashes). CI reads them and runs `istioctl install --revision 1-30-4`. Upgrading Istio is editing those two lines; CI redeploys.
-2. **A `default` tag points workloads at the live revision.** After the control plane installs, CI runs `istioctl tag set default --revision 1-30-4 --overwrite`. Namespaces and workloads inject with `istio.io/rev: default`, so an upgrade needs no per-namespace edit, just a new revision and a re-point of the tag.
+2. **A `default` tag points workloads at the live revision.** After the control plane installs, CI runs `istioctl tag set default --revision 1-30-4 --overwrite`. Namespaces and workloads inject with `istio.io/rev: default`, so an upgrade needs no per-namespace edit: a new revision, then a re-point of the tag.
 
 ## Three gateways, all right-sized
 
-Every gateway requests `32m` CPU and `32Mi` memory with hostname anti-affinity, so they spread across boards and stay within the Pi budget.
+Every gateway requests `32m` CPU and `32Mi` memory with hostname anti-affinity, so they spread across boards and stay in the Pi budget.
 
 | Gateway | Role | Service type |
 |---|---|---|
@@ -32,7 +32,7 @@ Only the public gateway is reachable from outside, and only through the frp traf
 
 ## Mirror the images to GHCR
 
-Because Docker Hub's anonymous limit would throttle a whole home NAT behind one IP, `pilot` (istiod) and `proxyv2` (gateways, sidecars, istio-init) are mirrored to a GHCR repo. The `hub` is overridden in three places: the control-plane `IstioOperator` (`spec.hub`), every gateway `IstioOperator`, and the sidecar-injector ConfigMap (`values.global.hub`):
+Docker Hub's anonymous limit would throttle a whole home NAT behind one IP, so `pilot` (istiod) and `proxyv2` (gateways, sidecars, istio-init) are mirrored to a GHCR repo. The `hub` is overridden in three places: the control-plane `IstioOperator` (`spec.hub`), every gateway `IstioOperator`, and the sidecar-injector ConfigMap (`values.global.hub`):
 
 ```yaml
 # IstioOperator (control plane and each gateway)
@@ -41,11 +41,11 @@ spec:
   tag: 1.30.4
 ```
 
-Miss a spot and those pods pull from Docker Hub and hit the limit; miss the mirror for a new version and every pod `ImagePullBackOff`s on a tag that does not exist yet.
+**Miss one spot and those pods pull from Docker Hub and hit the limit; miss the mirror for a new version and every pod `ImagePullBackOff`s** on a tag that does not exist yet.
 
 ## One object set per public host
 
-Each public hostname gets the same bundle of objects under git, all synced by ArgoCD:
+Each public hostname gets the same bundle of objects in git, all synced by ArgoCD:
 
 | Object | Purpose |
 |---|---|
@@ -60,11 +60,11 @@ Each public hostname gets the same bundle of objects under git, all synced by Ar
 
 ## Sidecar mode only
 
-Just two images are in play, `pilot` and `proxyv2`. There is no istio-cni and no ambient or ztunnel, by choice: neither earns its complexity on a five-node lab. If you are raising header limits or stamping connection metadata onto requests through this mesh, the [HTTP header limits](../engineering-notes/http-header-limits.md) guide and the [Envoy header-operator](../../til/posts/2026-09-29-istio-custom-request-response-header-value-with-envoy-operators.md) and [injected-annotation](../../til/posts/2026-10-07-istio-inject-annotation-to-all-sidecars.md) notes cover the sidecar-level knobs.
+Two images are in play, `pilot` and `proxyv2`. No istio-cni, no ambient or ztunnel, by choice: neither earns its complexity on a five-node lab. For the sidecar-level knobs, raising header limits or stamping connection metadata onto requests, see the [HTTP header limits](../engineering-notes/http-header-limits.md) guide and the [Envoy header-operator](../../til/posts/2026-09-29-istio-custom-request-response-header-value-with-envoy-operators.md) and [injected-annotation](../../til/posts/2026-10-07-istio-inject-annotation-to-all-sidecars.md) notes.
 
 ## Trade-offs
 
-- **The GHCR mirror is a manual step per upgrade.** Before bumping the version, the new `pilot` and `proxyv2` have to be re-mirrored, or CI pulls a tag that does not exist.
+- **The GHCR mirror is a manual step per upgrade.** Before bumping the version, re-mirror the new `pilot` and `proxyv2`, or CI pulls a tag that does not exist.
 - **Default-deny punishes a forgotten object.** A host with a Gateway and VirtualService but no AuthorizationPolicy silently returns 403, so the failure looks like the app and not the mesh.
 - **One more platform to keep current.** Istio runs a roughly quarterly release train and drops support N-2, so staying patched is recurring work.
 
