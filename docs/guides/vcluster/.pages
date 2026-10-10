@@ -1,0 +1,9 @@
+title: vcluster
+nav:
+  - index.md
+  - 01-simple-cluster.md
+  - 02-control-plane-san.md
+  - 03-export-kubeconfig.md
+  - 04-resource-quota.md
+  - 05-deploy-manifests.md
+  - 06-deploy-helm-charts.md

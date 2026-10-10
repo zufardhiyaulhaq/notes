@@ -7,6 +7,7 @@ the various `-learning` repos. Browse by topic:
 - [Home Lab](home-lab/index.md): the five-node k3s cluster on Raspberry Pi the rest of these guides run on, written up decision by decision: the install, frp remote access, GitOps with ArgoCD, Istio ingress, the DNS fix, and a Tailscale backup path.
 - [Engineering Notes](engineering-notes/certificate-pinning.md): standalone how-tos, like certificate pinning, creating a kubeconfig from a ServiceAccount, and building/pushing Docker images.
 - [CloudNativePG](cloudnativepg/index.md): a hands-on series on running PostgreSQL with the CloudNativePG operator.
+- [vcluster](vcluster/index.md): running virtual Kubernetes clusters with the vcluster Helm chart, from a minimal install to custom SANs, exported kubeconfigs, quotas, and startup bootstrap.
 - [VictoriaMetrics](victoriametrics/index.md): a series on running the VictoriaMetrics Kubernetes stack, starting with GitOps for Grafana dashboards.
 - [KEDA](keda/index.md): event-driven autoscaling on Kubernetes with cron, HTTP, and workload scalers.
 - [vLLM](vllm/index.md): notes on deploying large language models across multiple nodes.
