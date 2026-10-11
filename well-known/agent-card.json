@@ -1,0 +1,19 @@
+{
+  "name": "Zufar's Notes",
+  "kind": "content-resource",
+  "url": "https://notes.zufardhiyaulhaq.com/",
+  "description": "Working notes by Zufar Dhiyaulhaq: TIL (today I learned) entries and engineering guides on Kubernetes, service mesh, databases, home-lab infrastructure, and cloud operations.",
+  "languages": ["en"],
+  "topics": ["Kubernetes", "Istio", "Service Mesh", "CloudNativePG", "VictoriaMetrics", "KEDA", "Home Lab"],
+  "resources": {
+    "llms_txt": "https://notes.zufardhiyaulhaq.com/llms.txt",
+    "sitemap": "https://notes.zufardhiyaulhaq.com/sitemap.xml",
+    "feed_created": "https://notes.zufardhiyaulhaq.com/feed_rss_created.xml",
+    "feed_updated": "https://notes.zufardhiyaulhaq.com/feed_rss_updated.xml",
+    "markdown_twins": "Each page is also available as plain Markdown for agents at its path plus index.md (e.g. https://notes.zufardhiyaulhaq.com/index.md)."
+  },
+  "contact": {
+    "url": "https://notes.zufardhiyaulhaq.com/"
+  },
+  "note": "notes.zufardhiyaulhaq.com is a static documentation site (MkDocs). It publishes notes and guides and does not expose a callable agent endpoint: there is no A2A agent, no MCP server, no API, and no OAuth here. This manifest describes the site only as a content resource for AI agents. The resources listed above are plain files an agent can read directly."
+}

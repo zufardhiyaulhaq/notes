@@ -56,6 +56,9 @@ extra:
       link: https://www.linkedin.com/in/zufardhiyaulhaq
   homepage: https://zufardhiyaulhaq.com
 
+hooks:
+  - hooks/well_known.py
+
 plugins:
   - search
   - mkdocs-jupyter:
