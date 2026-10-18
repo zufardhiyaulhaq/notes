@@ -13,29 +13,13 @@ metadata:
   name: test-control-plane
   namespace: kamaji-system
 spec:
-  dataStore: default
   controlPlane:
-    deployment:
-      replicas: 2
-      resources:
-        apiServer:
-          requests:
-            cpu: 250m
-            memory: 512Mi
-        controllerManager:
-          requests:
-            cpu: 100m
-            memory: 256Mi
-        scheduler:
-          requests:
-            cpu: 50m
-            memory: 128Mi
+    deployment: {}
     service:
       serviceType: LoadBalancer
   kubernetes:
     version: v1.34.12
     kubelet:
-      cgroupfs: systemd
       configurationJSONPatches:
         - op: replace
           path: ""
@@ -43,38 +27,25 @@ spec:
             apiVersion: kubelet.config.k8s.io/v1beta1
             kind: KubeletConfiguration
             authentication:
-              anonymous:
-                enabled: false
-              webhook:
-                enabled: true
               x509:
                 clientCAFile: /etc/kubernetes/pki/ca.crt
-            authorization:
-              mode: Webhook
             cgroupDriver: systemd
             clusterDNS:
               - 10.96.0.10
             clusterDomain: cluster.local
-            healthzBindAddress: 127.0.0.1
-            healthzPort: 10248
             rotateCertificates: true
-            staticPodPath: /etc/kubernetes/manifests
-  networkProfile:
-    port: 6443
-    podCidr: 10.244.0.0/16
-    serviceCidr: 10.96.0.0/16
-    dnsServiceIPs:
-      - 10.96.0.10
+  networkProfile: {}
   addons:
     coreDNS: {}
     kubeProxy: {}
-    konnectivity:
-      server:
-        port: 8132
+    konnectivity: {}
 ```
 
-- `dataStore: default` is the etcd `DataStore` the chart created.
-- `replicas: 2` runs 2 control-plane pods. Each pod has 4 containers: `kube-apiserver`, `kube-controller-manager`, `kube-scheduler` and `konnectivity-server`.
+- No `dataStore`: the TCP uses the operator's default, `default`, which is the etcd `DataStore` the chart created.
+- `controlPlane` is the smallest block Kamaji accepts. `serviceType` has no default. `deployment: {}` must be there even when empty, or Kamaji's defaulting webhook fails with `doc is missing path: "/spec/controlPlane/deployment/replicas"`.
+- The defaults fill in 2 control-plane pods (`replicas: 2`), a rolling update with `maxSurge: 100%` and `maxUnavailable: 0`, images from `registry.k8s.io`, and **no resource requests**. Each pod has 4 containers: `kube-apiserver`, `kube-controller-manager`, `kube-scheduler` and `konnectivity-server`.
+- `networkProfile: {}` must be there even when empty. The defaults (port `6443`, `podCidr: 10.244.0.0/16`, `serviceCidr: 10.96.0.0/16`, `dnsServiceIPs: [10.96.0.10]`, `clusterDomain: cluster.local`) are only filled in when the block exists. Without it the field stays `null`.
+- `addons` are opt-in: an empty `{}` turns each one on with its defaults. `konnectivity: {}` gives the server port `8132` and the agent as a DaemonSet.
 - `configurationJSONPatches` replaces the whole kubelet config that Kamaji generates. Without it, a tenant older than the Kamaji build cannot join workers. See below.
 
 ### Why replace the kubelet config
@@ -88,11 +59,20 @@ FeatureGate KubeletCrashLoopBackOffMax not enabled, CrashLoopBackOff.MaxContaine
 
 `kubeadm join` then waits on `[kubelet-check]` until it times out after 4 minutes. Plain kubeadm does not have this problem: it writes only about 12 fields and lets each kubelet default the rest for its own version. Upstream knows about it ([#1047](https://github.com/clastix/kamaji/issues/1047), [#1062](https://github.com/clastix/kamaji/issues/1062)), and its answer is `configurationJSONPatches`.
 
-The patch above does what kubeadm does:
+The patch goes one step further than kubeadm and keeps only the 5 settings a worker kubelet has no usable default for:
+
+| Field | Why it is needed |
+|-|-|
+| `authentication.x509.clientCAFile` | The API server calls the kubelet (`logs`, `exec`) with a client certificate signed by this CA |
+| `cgroupDriver` | The kubelet default is `cgroupfs`, but containerd on a systemd distro uses `systemd` |
+| `clusterDNS`, `clusterDomain` | No default. Pods get them in `/etc/resolv.conf` |
+| `rotateCertificates` | The default is `false`. Without it the kubelet client certificate is never renewed |
+
+The kubelet fills in the rest for its own version: anonymous auth off, webhook authentication and authorization on, and healthz on `127.0.0.1:10248`. Workers run no static pods, so `staticPodPath` is not needed.
 
 - `op: replace` with `path: ""` swaps the whole generated document for ours, so none of Kamaji's defaults reach the ConfigMap, also after a future Kamaji upgrade.
 - Do not use `op: remove` per field. A `remove` on a field that is not there fails the whole phase, and the fields change between Kamaji builds.
-- `clusterDNS`, `clusterDomain` and `cgroupDriver` must match `networkProfile`. Change both together.
+- `clusterDNS` and `clusterDomain` must match `networkProfile`. Change both together. `cgroupDriver` must match the container runtime on the workers (`systemd` for containerd on a systemd distro).
 - `resolvConf` is left out on purpose, so `kubeadm join` on the node can detect systemd-resolved.
 - Kamaji rewrites `kubelet-config` on every reconcile, so the patch applies as soon as the TCP changes. A manual edit to the ConfigMap is reverted.
 
@@ -103,7 +83,7 @@ kubectl --kubeconfig test-control-plane.kubeconfig -n kube-system get cm kubelet
   -o jsonpath='{.data.kubelet}' | grep -c -E 'maxContainerRestartPeriod|imagePullCredentialsVerificationPolicy|memoryReservationPolicy'
 ```
 
-Expect `0`. On `26.10.3-edge` the ConfigMap goes from 102 lines to 48.
+Expect `0`. On `26.10.3-edge` the ConfigMap goes from 102 lines to 42.
 
 ```bash
 kubectl apply -f test-control-plane.yaml
