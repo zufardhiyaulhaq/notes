@@ -36,6 +36,29 @@ spec:
     version: v1.34.12
     kubelet:
       cgroupfs: systemd
+      configurationJSONPatches:
+        - op: replace
+          path: ""
+          value:
+            apiVersion: kubelet.config.k8s.io/v1beta1
+            kind: KubeletConfiguration
+            authentication:
+              anonymous:
+                enabled: false
+              webhook:
+                enabled: true
+              x509:
+                clientCAFile: /etc/kubernetes/pki/ca.crt
+            authorization:
+              mode: Webhook
+            cgroupDriver: systemd
+            clusterDNS:
+              - 10.96.0.10
+            clusterDomain: cluster.local
+            healthzBindAddress: 127.0.0.1
+            healthzPort: 10248
+            rotateCertificates: true
+            staticPodPath: /etc/kubernetes/manifests
   networkProfile:
     port: 6443
     podCidr: 10.244.0.0/16
@@ -52,6 +75,35 @@ spec:
 
 - `dataStore: default` is the etcd `DataStore` the chart created.
 - `replicas: 2` runs 2 control-plane pods. Each pod has 4 containers: `kube-apiserver`, `kube-controller-manager`, `kube-scheduler` and `konnectivity-server`.
+- `configurationJSONPatches` replaces the whole kubelet config that Kamaji generates. Without it, a tenant older than the Kamaji build cannot join workers. See below.
+
+### Why replace the kubelet config
+
+Kamaji writes the tenant's `kube-system/kubelet-config` ConfigMap, and `kubeadm join` copies it to `/var/lib/kubelet/config.yaml` on every worker. Kamaji fills it with **every default of its built-in Kubernetes library**, not of the tenant version. `26.10.3-edge` is built on `k8s.io/kubernetes v1.37.1`, so a `v1.34.12` tenant gets 1.37 defaults, and the 1.34 kubelet refuses to start:
+
+```
+FeatureGate KubeletCrashLoopBackOffMax not enabled, CrashLoopBackOff.MaxContainerRestartPeriod must not be set
+`imagePullCredentialsVerificationPolicy` must not be set if KubeletEnsureSecretPulledImages feature gate is not enabled
+```
+
+`kubeadm join` then waits on `[kubelet-check]` until it times out after 4 minutes. Plain kubeadm does not have this problem: it writes only about 12 fields and lets each kubelet default the rest for its own version. Upstream knows about it ([#1047](https://github.com/clastix/kamaji/issues/1047), [#1062](https://github.com/clastix/kamaji/issues/1062)), and its answer is `configurationJSONPatches`.
+
+The patch above does what kubeadm does:
+
+- `op: replace` with `path: ""` swaps the whole generated document for ours, so none of Kamaji's defaults reach the ConfigMap, also after a future Kamaji upgrade.
+- Do not use `op: remove` per field. A `remove` on a field that is not there fails the whole phase, and the fields change between Kamaji builds.
+- `clusterDNS`, `clusterDomain` and `cgroupDriver` must match `networkProfile`. Change both together.
+- `resolvConf` is left out on purpose, so `kubeadm join` on the node can detect systemd-resolved.
+- Kamaji rewrites `kubelet-config` on every reconcile, so the patch applies as soon as the TCP changes. A manual edit to the ConfigMap is reverted.
+
+Check it after the TCP is applied, with the tenant kubeconfig from the next section:
+
+```bash
+kubectl --kubeconfig test-control-plane.kubeconfig -n kube-system get cm kubelet-config \
+  -o jsonpath='{.data.kubelet}' | grep -c -E 'maxContainerRestartPeriod|imagePullCredentialsVerificationPolicy|memoryReservationPolicy'
+```
+
+Expect `0`. On `26.10.3-edge` the ConfigMap goes from 102 lines to 48.
 
 ```bash
 kubectl apply -f test-control-plane.yaml
